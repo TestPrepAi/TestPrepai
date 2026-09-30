@@ -1,0 +1,118 @@
+{
+  "project_name": "JEE & NEET AI Mock Test Platform (TestPrep AI)",
+  "context_type": "edtech_saas_and_exam_simulator",
+  "theme": {
+    "primary_mode": "dark_performance",
+    "description": "Tactical Academic Precision with high-contrast Obsidian slate backgrounds, energetic Cyber Indigo & Amber accent highlights for streak/paywall notifications, and clean NTA-simulator clarity."
+  },
+  "typography": {
+    "headline_font": "Cabinet Grotesk, Manrope, sans-serif",
+    "body_font": "Inter, system-ui, sans-serif",
+    "mono_font": "JetBrains Mono, Source Code Pro, monospace",
+    "font_family_imports": "@import url('https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@600;700;800;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');",
+    "hierarchy": {
+      "h1_hero": "text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-none",
+      "h2_section": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+      "h3_subsection": "text-xl sm:text-2xl font-semibold",
+      "h4_card": "text-lg sm:text-xl font-semibold",
+      "body": "text-base sm:text-sm text-slate-300 leading-relaxed",
+      "caption": "text-xs font-medium uppercase tracking-widest text-slate-400"
+    },
+    "rules": [
+      "DO NOT use Inter or Roboto for Main/Sub-headings. Use Cabinet Grotesk or Manrope.",
+      "Max hero font size is text-6xl. Do not exceed to 7xl or 8xl.",
+      "For formulas, question numbers, timers, and code snippets, use JetBrains Mono."
+    ]
+  },
+  "colors": {
+    "dark_palette": {
+      "background": "#0B0F19",
+      "surface_card": "#111827",
+      "surface_border": "#1F2937",
+      "primary": "#6366F1",
+      "primary_hover": "#4F46E5",
+      "amber_accent": "#F59E0B",
+      "emerald_success": "#10B981",
+      "rose_danger": "#EF4444",
+      "sky_info": "#0EA5E9",
+      "text_main": "#F9FAFB",
+      "text_muted": "#9CA3AF"
+    },
+    "light_palette": {
+      "background": "#F8FAFC",
+      "surface_card": "#FFFFFF",
+      "surface_border": "#E2E8F0",
+      "primary": "#4F46E5",
+      "primary_hover": "#4338CA",
+      "amber_accent": "#D97706",
+      "emerald_success": "#059669",
+      "rose_danger": "#DC2626",
+      "sky_info": "#0284C7",
+      "text_main": "#0F172A",
+      "text_muted": "#64748B"
+    },
+    "contrast_rules": [
+      "Always set explicit text color on hover (e.g. hover:bg-slate-800 hover:text-white).",
+      "Never use pure transparent backgrounds under headers or dropdown overlays. Use backdrop-blur-xl bg-slate-900/90 or solid bg-slate-900.",
+      "Forbidden colors: Do not use #7351B7 for main AI brand elements or #1B93A4 for dark dashboard backgrounds."
+    ]
+  },
+  "spacing_and_layout": {
+    "system": "Generous Spacing (Tailwind Scale: p-4, p-6, p-8, p-12, gap-6, gap-8)",
+    "grid_modes": {
+      "dashboard_bento": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+      "test_simulator": "grid grid-cols-1 lg:grid-cols-12 gap-6 (Left Q-panel col-span-8/9, Right Palette col-span-4/3)"
+    },
+    "rules": [
+      "Containers with borders MUST have internal padding (p-6 or p-8) to prevent text collision.",
+      "Grid children MUST be direct children. When animating with framer-motion, apply grid item classes directly to motion.div.",
+      "Image constraint on mobile: max-h-[80vh]."
+    ]
+  },
+  "key_components": {
+    "navigation_bar": {
+      "style": "Fixed top z-50 backdrop-blur-xl bg-slate-900/90 border-b border-slate-800",
+      "features": ["Brand Logo 'JEE/NEET AI'", "Nav Links: Dashboard, Create Test, Analytics, Pricing, History", "Free Questions Left Badge (e.g., '3/5 Free Left')", "Razorpay ₹49 CTA Button"]
+    },
+    "exam_simulator": {
+      "features": [
+        "Live Countdown Timer with color states (Green >50%, Amber 20-50%, Red <20%)",
+        "Subject Tabs (Physics, Chemistry, Mathematics / Biology)",
+        "NTA-Style Question Palette with status counters: Answered (Green), Not Answered (Red), Marked for Review (Purple), Not Visited (Gray)",
+        "Action Buttons: 'Save & Next', 'Clear Response', 'Mark for Review & Next', 'Submit Test'",
+        "Detailed Solution Accordion & ChatGPT Step-by-Step AI Explanation drawer upon submission"
+      ]
+    },
+    "paywall_modal": {
+      "trigger": "Triggered when user attempts 6th question or creates 2nd test after consuming 5 free questions",
+      "title": "Unlock Unlimited JEE & NEET Mock Tests",
+      "price": "₹49 for 28 Days",
+      "highlights": [
+        "Unlimited ChatGPT-generated AI Mock Tests",
+        "JEE Main, JEE Advanced & NEET customized difficulty",
+        "Step-by-step instant solution explanations & weak area analytics",
+        "Direct Razorpay Payment Integration link"
+      ]
+    },
+    "analytics_dashboard": {
+      "charts": ["Recharts Accuracy Line Chart", "Subject Breakup Bar Chart", "Time Spent Per Question Gauge", "Weak Topics Matrix"]
+    }
+  },
+  "image_urls": {
+    "student_hero": "https://images.unsplash.com/photo-1637589308599-3478cc55510d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwyfHxpbmRpYW4lMjBzdHVkZW50JTIwc3R1ZHlpbmclMjBsYXB0b3AlMjB0ZXN0JTIwcHJlcGFyYXRpb258ZW58MHx8fHwxNzkwMDAwNjUzfDA&ixlib=rb-4.1.0&q=85",
+    "student_studying": "https://images.unsplash.com/photo-1716471361267-9bc5d3291fbe?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwzfHxpbmRpYW4lMjBzdHVkZW50JTIwc3R1ZHlpbmclMjBsYXB0b3AlMjB0ZXN0JTIwcHJlcGFyYXRpb258ZW58MHx8fHwxNzkwMDAwNjUzfDA&ixlib=rb-4.1.0&q=85",
+    "student_group": "https://images.pexels.com/photos/5553053/pexels-photo-5553053.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "formulas_chalkboard": "https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwyfHxwaHlzaWNzJTIwY2hlbWlzdHJ5JTIwbWF0aGVtYXRpY3MlMjBzY2llbmNlJTIwbGFib3JhdG9yeSUyMGZvcm11bGFzfGVufDB8fHx8MTc5MDc5MTA2OXww&ixlib=rb-4.1.0&q=85",
+    "science_paper": "https://images.unsplash.com/photo-1708011271954-c0d2b3155ded?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwzfHxwaHlzaWNzJTIwY2hlbWlzdHJ5JTIwbWF0aGVtYXRpY3MlMjBzY2llbmNlJTIwbGFib3JhdG9yeSUyMGZvcm11bGFzfGVufDB8fHx8MTc5MDc5MTA2OXww&ixlib=rb-4.1.0&q=85",
+    "victory_student": "https://images.unsplash.com/photo-1659352785645-61edc2ddbed4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzB8MHwxfHNlYXJjaHwzfHxzdHVkZW50JTIwZXhhbSUyMHN1Y2Nlc3MlMjBqb3klMjB2aWN0b3J5JTIwY2VsZWJyYXRpb258ZW58MHx8fHwxNzkwNzkxMDc3fDA&ixlib=rb-4.1.0&q=85"
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "This codebase uses JavaScript (.js / .jsx) files. Do NOT use TypeScript syntax or create .tsx files.",
+    "ALL interactive elements (buttons, inputs, links, tabs, questions, palette buttons, Razorpay triggers) MUST include a data-testid attribute in kebab-case (e.g. data-testid='start-mock-test-button', data-testid='question-palette-item-1', data-testid='razorpay-pay-button').",
+    "Use 'sonner' for all toast notifications (Sonner component is at src/components/ui/sonner.js or sonner.jsx).",
+    "DO NOT add text-align: center to global .App class or main container.",
+    "DO NOT use generic AI emoji icons (🤖🧠💭💡) as main section icons. Use Lucide icons (lucide-react).",
+    "Ensure the first 5 questions free tracking is strictly reflected in UI state with a visible counter badge.",
+    "The ₹49 for 28 days plan paywall modal or Razorpay action section must be clearly accessible and highlighted with the amber/indigo CTA."
+  ]
+}
