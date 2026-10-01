@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import AppShell from "@/components/AppShell";
+import StreakCard from "@/components/StreakCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,7 +81,8 @@ export default function DailyTask() {
 
   return (
     <AppShell title="Daily Task">
-      <div className="max-w-3xl">
+      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center">
             <Calendar className="w-6 h-6 text-amber-600" />
@@ -96,19 +98,32 @@ export default function DailyTask() {
         ) : existing ? (
           <Card className="p-6 bg-emerald-50 border-emerald-200" data-testid="daily-existing-card">
             <div className="flex items-center gap-2 text-emerald-700 font-semibold mb-2">
-              <CheckCircle2 className="w-5 h-5" /> Already generated for today
+              <CheckCircle2 className="w-5 h-5" /> {existing.completed ? "Today's quiz completed — streak protected!" : "Already generated for today"}
             </div>
             <div className="text-sm text-slate-700">
               Topic: <span className="font-semibold">{existing.topic}</span> · Subject: <span className="capitalize font-semibold">{existing.subject}</span>
+              {existing.completed && existing.score_pct != null && (
+                <> · Score: <span className="font-mono font-semibold" data-testid="daily-score">{existing.score_pct}%</span></>
+              )}
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button
-                data-testid="daily-open-test"
-                onClick={() => nav(`/test/${existing.test_id}`)}
-                className="bg-violet-600 hover:bg-violet-700 text-white"
-              >
-                Open quiz
-              </Button>
+              {existing.completed ? (
+                <Button
+                  data-testid="daily-view-result"
+                  onClick={() => nav(`/result/${existing.attempt_id}`)}
+                  className="bg-violet-600 hover:bg-violet-700 text-white"
+                >
+                  View result
+                </Button>
+              ) : (
+                <Button
+                  data-testid="daily-open-test"
+                  onClick={() => nav(`/test/${existing.test_id}`)}
+                  className="bg-violet-600 hover:bg-violet-700 text-white"
+                >
+                  Open quiz
+                </Button>
+              )}
               <Button
                 data-testid="daily-regenerate"
                 variant="outline"
@@ -195,6 +210,14 @@ export default function DailyTask() {
             )}
           </Card>
         )}
+      </div>
+      <aside className="space-y-4">
+        <StreakCard />
+        <div className="soft-card rounded-2xl p-5 text-sm text-slate-600">
+          <div className="font-semibold text-slate-900 mb-1">How streaks work</div>
+          Finish today's topic quiz to add a day. Miss a day and the streak resets — come back tomorrow to keep it alive.
+        </div>
+      </aside>
       </div>
     </AppShell>
   );

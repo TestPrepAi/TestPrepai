@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { CheckCircle2, ExternalLink, Sparkles } from "lucide-react";
+import { CheckCircle2, ExternalLink, Sparkles, Loader2, ShieldCheck } from "lucide-react";
 
 const FEATURES = [
   "Unlimited AI mock tests (JEE Main / Advanced / NEET)",
@@ -27,6 +27,7 @@ export default function Pricing() {
   const [open, setOpen] = useState(false);
   const [ref, setRef] = useState("");
   const [busy, setBusy] = useState(false);
+  const [waiting, setWaiting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -36,6 +37,35 @@ export default function Pricing() {
       } catch { /* ignore */ }
     })();
   }, [user]);
+
+  useEffect(() => {
+    if (!waiting) return;
+    const started = Date.now();
+    const t = setInterval(async () => {
+      try {
+        const { data } = await api.get("/auth/me");
+        if (data.user.is_subscribed) {
+          setWaiting(false);
+          await refresh();
+          toast.success("Payment received — PRO activated for 28 days!");
+          nav("/dashboard");
+        }
+      } catch { /* ignore */ }
+      if (Date.now() - started > 10 * 60 * 1000) setWaiting(false);
+    }, 5000);
+    return () => clearInterval(t);
+  }, [waiting, refresh, nav]);
+
+  const payLink = link && user
+    ? `${link}${link.includes("?") ? "&" : "?"}email=${encodeURIComponent(user.email)}&name=${encodeURIComponent(user.name)}`
+    : link;
+
+  const openPayment = () => {
+    if (!payLink) return;
+    if (!user) return nav("/login");
+    window.open(payLink, "_blank");
+    setWaiting(true);
+  };
 
   const activate = async () => {
     if (!ref.trim()) return toast.error("Enter your Razorpay payment reference");
@@ -85,28 +115,43 @@ export default function Pricing() {
             </span>
           </div>
         ) : (
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button
-              data-testid="pricing-razorpay-btn"
-              size="lg"
-              className="h-12 px-6 bg-violet-600 hover:bg-violet-700 text-white rounded-full"
-              onClick={() => link && window.open(link, "_blank")}
-              disabled={!link}
-            >
-              Pay ₹49 via Razorpay <ExternalLink className="w-4 h-4 ml-2" />
-            </Button>
-            <Button
-              data-testid="pricing-activate-btn"
-              size="lg"
-              variant="outline"
-              className="h-12 px-6 rounded-full border-slate-300"
-              onClick={() => {
-                if (!user) return nav("/login");
-                setOpen(true);
-              }}
-            >
-              I have paid — activate
-            </Button>
+          <div className="mt-8 space-y-4">
+            <div className="flex flex-wrap gap-3">
+              <Button
+                data-testid="pricing-razorpay-btn"
+                size="lg"
+                className="h-12 px-6 bg-violet-600 hover:bg-violet-700 text-white rounded-full"
+                onClick={openPayment}
+                disabled={!link}
+              >
+                Pay ₹49 via Razorpay <ExternalLink className="w-4 h-4 ml-2" />
+              </Button>
+              <Button
+                data-testid="pricing-activate-btn"
+                size="lg"
+                variant="outline"
+                className="h-12 px-6 rounded-full border-slate-300"
+                onClick={() => {
+                  if (!user) return nav("/login");
+                  setOpen(true);
+                }}
+              >
+                Paid with a different email?
+              </Button>
+            </div>
+            {waiting ? (
+              <div data-testid="pricing-waiting" className="flex items-center gap-3 rounded-xl bg-violet-50 border border-violet-200 px-4 py-3 text-sm text-violet-800">
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                <span>Waiting for Razorpay to confirm your payment… PRO activates automatically within a few seconds of paying.</span>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>
+                  PRO activates automatically after payment. Use <span className="font-semibold text-slate-700">{user?.email || "your TrackPrep email"}</span> on the Razorpay checkout so we can match it instantly.
+                </span>
+              </p>
+            )}
           </div>
         )}
       </Card>
@@ -115,7 +160,7 @@ export default function Pricing() {
         <DialogContent className="bg-white">
           <DialogHeader>
             <DialogTitle className="font-display">Activate your subscription</DialogTitle>
-            <DialogDescription>Enter the Razorpay payment reference / transaction ID after paying ₹49.</DialogDescription>
+            <DialogDescription>If you paid with a different email, paste the Razorpay payment ID (starts with pay_) from your receipt and we'll link it to this account.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             <Label htmlFor="ref">Payment reference</Label>

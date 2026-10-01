@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -6,6 +6,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import re
 import json
+import hmac
+import hashlib
 import logging
 import uuid
 import jwt
@@ -24,7 +26,9 @@ MONGO_URL = os.environ['MONGO_URL']
 DB_NAME = os.environ['DB_NAME']
 JWT_SECRET = os.environ['JWT_SECRET']
 EMERGENT_LLM_KEY = os.environ['EMERGENT_LLM_KEY']
-RAZORPAY_PAYMENT_LINK = os.environ.get('RAZORPAY_PAYMENT_LINK', 'https://rzp.io/l/testprep-ai')
+RAZORPAY_PAYMENT_LINK = os.environ['RAZORPAY_PAYMENT_LINK']
+RAZORPAY_WEBHOOK_SECRET = os.environ.get('RAZORPAY_WEBHOOK_SECRET', '')
+PLAN_AMOUNT_PAISE = 4900
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
@@ -333,23 +337,105 @@ async def sub_status(user=Depends(get_current_user)):
 
 @api_router.post("/subscription/activate")
 async def activate_sub(inp: ActivateSubInput, user=Depends(get_current_user)):
-    # For MVP with static Razorpay link: user submits their payment reference/ID after paying.
-    # In production, verify via Razorpay webhook. Here we accept and record it.
-    expires = now_utc() + timedelta(days=SUBSCRIPTION_DAYS)
-    await db.users.update_one(
-        {"id": user["id"]},
-        {"$set": {"subscription_expires_at": iso(expires)}},
-    )
-    await db.payments.insert_one({
-        "id": str(uuid.uuid4()),
-        "user_id": user["id"],
-        "reference": inp.payment_reference.strip(),
-        "amount_inr": 49,
-        "days": SUBSCRIPTION_DAYS,
-        "created_at": iso(now_utc()),
-    })
+    # Fallback for students whose Razorpay email differs: match a webhook-recorded payment by its id
+    ref = inp.payment_reference.strip()
+    unmatched = await db.payments.find_one({"razorpay_payment_id": ref, "user_id": None}, {"_id": 0})
+    if unmatched:
+        await db.payments.update_one({"id": unmatched["id"]}, {"$set": {"user_id": user["id"], "status": "claimed"}})
+    else:
+        await db.payments.insert_one({
+            "id": str(uuid.uuid4()),
+            "user_id": user["id"],
+            "reference": ref,
+            "amount_inr": 49,
+            "days": SUBSCRIPTION_DAYS,
+            "status": "manual",
+            "created_at": iso(now_utc()),
+        })
+    await extend_subscription(user["id"])
     fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0})
     return {"user": user_public(fresh)}
+
+
+async def extend_subscription(user_id: str) -> str:
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    base = now_utc()
+    if user and user_is_subscribed(user):
+        base = datetime.fromisoformat(user["subscription_expires_at"])
+    expires = iso(base + timedelta(days=SUBSCRIPTION_DAYS))
+    await db.users.update_one({"id": user_id}, {"$set": {"subscription_expires_at": expires}})
+    return expires
+
+
+@api_router.post("/payments/razorpay/webhook")
+async def razorpay_webhook(request: Request):
+    if not RAZORPAY_WEBHOOK_SECRET:
+        raise HTTPException(503, "Webhook secret not configured")
+    body = await request.body()
+    signature = request.headers.get("X-Razorpay-Signature", "")
+    expected = hmac.new(RAZORPAY_WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        raise HTTPException(400, "Invalid signature")
+
+    try:
+        event = json.loads(body)
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+
+    event_name = event.get("event", "")
+    if event_name not in ("payment.captured", "payment_link.paid", "order.paid"):
+        return {"status": "ignored", "event": event_name}
+
+    payment = ((event.get("payload") or {}).get("payment") or {}).get("entity") or {}
+    payment_id = payment.get("id")
+    if not payment_id:
+        raise HTTPException(400, "Missing payment id")
+
+    if await db.payments.find_one({"razorpay_payment_id": payment_id}):
+        return {"status": "duplicate"}
+
+    amount = int(payment.get("amount") or 0)
+    if amount < PLAN_AMOUNT_PAISE:
+        await db.payments.insert_one({
+            "id": str(uuid.uuid4()), "user_id": None, "razorpay_payment_id": payment_id,
+            "amount_paise": amount, "status": "underpaid", "event": event_name,
+            "created_at": iso(now_utc()),
+        })
+        return {"status": "underpaid"}
+
+    notes = payment.get("notes") or {}
+    email = (payment.get("email") or notes.get("email") or "").strip().lower()
+    user = await db.users.find_one({"email": email}, {"_id": 0}) if email else None
+    if not user and notes.get("user_id"):
+        user = await db.users.find_one({"id": notes["user_id"]}, {"_id": 0})
+
+    record = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"] if user else None,
+        "razorpay_payment_id": payment_id,
+        "razorpay_order_id": payment.get("order_id"),
+        "email": email or None,
+        "contact": payment.get("contact"),
+        "amount_paise": amount,
+        "days": SUBSCRIPTION_DAYS,
+        "event": event_name,
+        "status": "activated" if user else "unmatched",
+        "created_at": iso(now_utc()),
+    }
+    await db.payments.insert_one(record)
+    if not user:
+        logger.warning(f"Razorpay payment {payment_id} has no matching user for email={email}")
+        return {"status": "unmatched"}
+
+    expires = await extend_subscription(user["id"])
+    logger.info(f"PRO activated via webhook for {user['email']} until {expires}")
+    return {"status": "activated", "expires_at": expires}
+
+
+@api_router.get("/payments/mine")
+async def my_payments(user=Depends(get_current_user)):
+    cursor = db.payments.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).limit(20)
+    return {"payments": await cursor.to_list(20)}
 
 
 @api_router.post("/tests/generate", response_model=TestOut)
@@ -484,11 +570,45 @@ async def submit_test(inp: SubmitInput, user=Depends(get_current_user)):
         "created_at": iso(now_utc()),
     }
     await db.attempts.insert_one(attempt)
+
+    if t.get("source") == "daily":
+        await db.daily_tasks.update_one(
+            {"user_id": user["id"], "test_id": t["id"]},
+            {"$set": {"completed": True, "completed_at": attempt["created_at"], "attempt_id": attempt["id"],
+                      "score_pct": score_pct}},
+        )
+
+    wrong = [d for d in details if d["selected_index"] is not None and not d["is_correct"]]
+    for d in wrong:
+        await db.mistakes.update_one(
+            {"user_id": user["id"], "question_id": d["question_id"]},
+            {"$setOnInsert": {
+                "id": str(uuid.uuid4()),
+                "user_id": user["id"],
+                "question_id": d["question_id"],
+                "attempt_id": attempt["id"],
+                "test_id": t["id"],
+                "exam": t["exam"],
+                "topic": t.get("topic"),
+                "subject": d["subject"],
+                "text": d["text"],
+                "options": d["options"],
+                "correct_index": d["correct_index"],
+                "selected_index": d["selected_index"],
+                "explanation": d["explanation"],
+                "difficulty": d["difficulty"],
+                "mastered": False,
+                "created_at": attempt["created_at"],
+            }},
+            upsert=True,
+        )
+
     return {
         "id": attempt["id"],
         "total": total, "correct": correct, "attempted": attempted,
         "score_pct": score_pct, "subject_stats": subject_stats,
         "details": details, "exam": t["exam"], "created_at": attempt["created_at"],
+        "is_daily": t.get("source") == "daily", "mistakes_added": len(wrong),
     }
 
 
@@ -584,6 +704,92 @@ async def daily_today(user=Depends(get_current_user)):
     return {"task": doc}
 
 
+def compute_streak(dates: set, today) -> dict:
+    yesterday = today - timedelta(days=1)
+    anchor = today if today in dates else (yesterday if yesterday in dates else None)
+    current = 0
+    if anchor:
+        d = anchor
+        while d in dates:
+            current += 1
+            d -= timedelta(days=1)
+    longest = 0
+    for d in sorted(dates):
+        if (d - timedelta(days=1)) not in dates:
+            run, cur = 0, d
+            while cur in dates:
+                run += 1
+                cur += timedelta(days=1)
+            longest = max(longest, run)
+    return {"current": current, "longest": longest}
+
+
+@api_router.get("/streak")
+async def streak(user=Depends(get_current_user)):
+    cursor = db.daily_tasks.find({"user_id": user["id"], "completed": True}, {"_id": 0, "date": 1})
+    docs = await cursor.to_list(2000)
+    dates = set()
+    for d in docs:
+        try:
+            dates.add(datetime.fromisoformat(d["date"]).date())
+        except Exception:
+            pass
+    today = now_utc().date()
+    s = compute_streak(dates, today)
+    week = []
+    for i in range(6, -1, -1):
+        d = today - timedelta(days=i)
+        week.append({"date": d.isoformat(), "day": d.strftime("%a"), "done": d in dates})
+    return {**s, "completed_today": today in dates, "total_days": len(dates), "week": week}
+
+
+class MistakeUpdate(BaseModel):
+    mastered: bool
+
+
+@api_router.get("/mistakes")
+async def list_mistakes(subject: Optional[str] = None, status_filter: Optional[str] = "open",
+                        user=Depends(get_current_user)):
+    q: Dict[str, Any] = {"user_id": user["id"]}
+    if subject:
+        q["subject"] = subject
+    if status_filter == "open":
+        q["mastered"] = False
+    elif status_filter == "mastered":
+        q["mastered"] = True
+    cursor = db.mistakes.find(q, {"_id": 0}).sort("created_at", -1).limit(300)
+    items = await cursor.to_list(300)
+    pipeline = [{"$match": {"user_id": user["id"]}},
+                {"$group": {"_id": {"subject": "$subject", "mastered": "$mastered"}, "n": {"$sum": 1}}}]
+    counts = {"open": 0, "mastered": 0, "by_subject": {}}
+    async for row in db.mistakes.aggregate(pipeline):
+        key = "mastered" if row["_id"]["mastered"] else "open"
+        counts[key] += row["n"]
+        subj = row["_id"]["subject"]
+        counts["by_subject"].setdefault(subj, {"open": 0, "mastered": 0})[key] += row["n"]
+    return {"mistakes": items, "counts": counts}
+
+
+@api_router.patch("/mistakes/{mistake_id}")
+async def update_mistake(mistake_id: str, inp: MistakeUpdate, user=Depends(get_current_user)):
+    res = await db.mistakes.update_one(
+        {"id": mistake_id, "user_id": user["id"]},
+        {"$set": {"mastered": inp.mastered, "mastered_at": iso(now_utc()) if inp.mastered else None}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Mistake not found")
+    doc = await db.mistakes.find_one({"id": mistake_id}, {"_id": 0})
+    return {"mistake": doc}
+
+
+@api_router.delete("/mistakes/{mistake_id}")
+async def delete_mistake(mistake_id: str, user=Depends(get_current_user)):
+    res = await db.mistakes.delete_one({"id": mistake_id, "user_id": user["id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Mistake not found")
+    return {"ok": True}
+
+
 @api_router.post("/daily/generate", response_model=TestOut)
 async def daily_generate(inp: DailyTaskInput, user=Depends(get_current_user)):
     # Validate subject vs user's target exam
@@ -640,6 +846,7 @@ async def daily_generate(inp: DailyTaskInput, user=Depends(get_current_user)):
             "topic": inp.topic,
             "subject": inp.subject,
             "test_id": test_doc["id"],
+            "completed": False,
             "created_at": iso(now_utc()),
         }},
         upsert=True,

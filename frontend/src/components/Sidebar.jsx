@@ -2,13 +2,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
-  Home, Calendar, PlusCircle, BarChart3, History, Gift, Sparkles, LogOut, BookOpen, Target
+  Home, Calendar, PlusCircle, BarChart3, History, Gift, Sparkles, LogOut, BookOpen, Target, NotebookPen
 } from "lucide-react";
 
 const NAV = [
   { to: "/dashboard", label: "Home", icon: Home, testid: "sidebar-home" },
   { to: "/daily-task", label: "Daily Task", icon: Calendar, testid: "sidebar-daily" },
   { to: "/create-test", label: "Custom Test", icon: PlusCircle, testid: "sidebar-create" },
+  { to: "/notebook", label: "Mistake Notebook", icon: NotebookPen, testid: "sidebar-notebook" },
   { to: "/analytics", label: "Analytics", icon: BarChart3, testid: "sidebar-analytics" },
   { to: "/history", label: "History", icon: History, testid: "sidebar-history" },
   { to: "/pricing", label: "Upgrade", icon: Gift, testid: "sidebar-pricing" },

@@ -14,6 +14,7 @@ import Result from "@/pages/Result";
 import Analytics from "@/pages/Analytics";
 import History from "@/pages/History";
 import Pricing from "@/pages/Pricing";
+import Notebook from "@/pages/Notebook";
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
             <Route path="/result/:id" element={<ProtectedRoute><Result /></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
             <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+            <Route path="/notebook" element={<ProtectedRoute><Notebook /></ProtectedRoute>} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

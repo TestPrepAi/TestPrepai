@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import AppShell from "@/components/AppShell";
+import ShareScoreCard from "@/components/ShareScoreCard";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { CheckCircle2, XCircle, MinusCircle, Loader2, PlusCircle } from "lucide-react";
+import { CheckCircle2, XCircle, MinusCircle, Loader2, PlusCircle, Share2, NotebookPen } from "lucide-react";
 
 export default function Result() {
   const { id } = useParams();
   const nav = useNavigate();
+  const { user } = useAuth();
   const [data, setData] = useState(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -30,15 +34,42 @@ export default function Result() {
     );
   }
 
+  const wrongCount = data.details.filter((d) => d.selected_index != null && !d.is_correct).length;
+
   return (
     <AppShell title="Result">
       <div className="max-w-5xl">
-        <div className="mb-6">
-          <div className="text-xs uppercase tracking-widest text-violet-600 font-semibold">Result</div>
-          <h1 className="font-display text-2xl md:text-3xl font-extrabold text-slate-900 mt-1" data-testid="result-heading">
-            {data.exam.replace("_", " ").toUpperCase()} · Score {data.score_pct}%
-          </h1>
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-violet-600 font-semibold">Result</div>
+            <h1 className="font-display text-2xl md:text-3xl font-extrabold text-slate-900 mt-1" data-testid="result-heading">
+              {data.exam.replace("_", " ").toUpperCase()} · Score {data.score_pct}%
+            </h1>
+          </div>
+          <Button
+            data-testid="result-share-btn"
+            onClick={() => setShareOpen(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-white rounded-full px-5"
+          >
+            <Share2 className="w-4 h-4 mr-2" /> Share score card
+          </Button>
         </div>
+        <ShareScoreCard open={shareOpen} onOpenChange={setShareOpen} result={data} userName={user?.name} />
+
+        {wrongCount > 0 && (
+          <div
+            data-testid="result-notebook-banner"
+            className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3"
+          >
+            <div className="flex items-center gap-2 text-sm text-rose-800">
+              <NotebookPen className="w-4 h-4" />
+              <span><span className="font-semibold">{wrongCount}</span> wrong answer{wrongCount === 1 ? "" : "s"} saved to your Mistake Notebook.</span>
+            </div>
+            <Button data-testid="result-notebook-link" size="sm" variant="outline" className="border-rose-300 text-rose-700 hover:bg-rose-100" onClick={() => nav("/notebook")}>
+              Open notebook
+            </Button>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Stat label="Correct" value={data.correct} accent="text-emerald-600" />

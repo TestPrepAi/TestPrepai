@@ -3,18 +3,19 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import AppShell from "@/components/AppShell";
+import StreakCard from "@/components/StreakCard";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
-  SlidersHorizontal, Clock3, BookMarked, Calendar, LineChart, Flame, Sparkles, ArrowRight
+  SlidersHorizontal, Clock3, BookMarked, Calendar, LineChart, Flame, Sparkles, ArrowRight, NotebookPen
 } from "lucide-react";
 
 const TOOLS = [
   { to: "/create-test", title: "Custom Test", sub: "Build your own", color: "bg-violet-100 text-violet-700", icon: SlidersHorizontal, testid: "tool-custom-test" },
   { to: "/daily-task", title: "Daily Task", sub: "Topic → quiz", color: "bg-amber-100 text-amber-700", icon: Calendar, testid: "tool-daily-task" },
-  { to: "/analytics", title: "Analytics", sub: "Track growth", color: "bg-rose-100 text-rose-700", icon: LineChart, testid: "tool-analytics" },
-  { to: "/history", title: "Past Attempts", sub: "Review mistakes", color: "bg-emerald-100 text-emerald-700", icon: BookMarked, testid: "tool-history" },
-  { to: "/create-test", title: "Timed Mock", sub: "NTA simulator", color: "bg-sky-100 text-sky-700", icon: Clock3, testid: "tool-timed-mock" },
+  { to: "/notebook", title: "Mistake Notebook", sub: "Revise wrong Qs", color: "bg-rose-100 text-rose-700", icon: NotebookPen, testid: "tool-notebook" },
+  { to: "/analytics", title: "Analytics", sub: "Track growth", color: "bg-sky-100 text-sky-700", icon: LineChart, testid: "tool-analytics" },
+  { to: "/history", title: "Past Attempts", sub: "Review results", color: "bg-emerald-100 text-emerald-700", icon: BookMarked, testid: "tool-history" },
   { to: "/pricing", title: "Go PRO", sub: "₹49 / 28 days", color: "bg-slate-900 text-amber-300", icon: Sparkles, testid: "tool-upgrade" },
 ];
 
@@ -30,18 +31,21 @@ export default function Dashboard() {
   const [attempts, setAttempts] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [daily, setDaily] = useState(null);
+  const [mistakeCount, setMistakeCount] = useState(0);
 
   useEffect(() => {
     (async () => {
       try {
-        const [a, s, d] = await Promise.all([
+        const [a, s, d, m] = await Promise.all([
           api.get("/attempts"),
           api.get("/analytics/summary"),
           api.get("/daily/today"),
+          api.get("/mistakes", { params: { status_filter: "open" } }),
         ]);
         setAttempts(a.data.attempts || []);
         setAnalytics(s.data);
         setDaily(d.data.task);
+        setMistakeCount(m.data.counts?.open || 0);
       } catch { /* ignore */ }
     })();
   }, []);
@@ -175,6 +179,7 @@ export default function Dashboard() {
 
         {/* Right rail */}
         <aside className="space-y-6">
+          <StreakCard />
           <div className="soft-card rounded-2xl p-6">
             <div className="flex items-baseline gap-2">
               <span className="font-display text-5xl font-extrabold text-violet-600 font-mono" data-testid="rail-days-left">
@@ -223,6 +228,10 @@ export default function Dashboard() {
           <div className="soft-card rounded-2xl p-6 space-y-3">
             <KV k="Questions Done" v={analytics?.total_questions ?? 0} testid="rail-questions-done" />
             <KV k="Tests Taken" v={analytics?.total_attempts ?? 0} testid="rail-tests-taken" />
+            <Link to="/notebook" data-testid="rail-mistakes-link" className="flex items-center justify-between py-1 hover:text-rose-600">
+              <span className="text-sm text-slate-500">Mistakes to revise</span>
+              <span className="font-mono font-bold text-rose-600">{mistakeCount}</span>
+            </Link>
             <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
               <div>
                 <div className="text-xs text-slate-500">Avg. Score</div>
