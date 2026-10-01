@@ -31,9 +31,20 @@ Reskin UI to TrackPrep-style light theme (sidebar nav, bento Study Tools, exam c
 - All critical interactive elements carry data-testid
 - Backend tested 100% pass (iteration_1)
 
+## Implemented (Oct 2026 — iteration 2)
+- Razorpay webhook `POST /api/payments/razorpay/webhook`: HMAC-SHA256 verify (`RAZORPAY_WEBHOOK_SECRET`), events payment.captured / payment_link.paid / order.paid, matches payer by email (or notes.user_id), idempotent on payment id, underpaid/unmatched records; `extend_subscription` stacks 28 days. Unmatched payments claimable via `/api/subscription/activate` with pay_ id. `GET /api/payments/mine`.
+- Real payment link set: `RAZORPAY_PAYMENT_LINK=https://rzp.io/rzp/TQzWjE4`; Pricing opens it with `?email=&name=` prefill and polls `/auth/me` every 5s (10 min) to auto-redirect on activation.
+- Daily streak: `daily_tasks.completed` set on submit of daily test; `GET /api/streak` → current/longest/completed_today/week. `StreakCard` on Dashboard + Daily Task page.
+- Mistake Notebook: wrong answers (not skipped) upserted into `mistakes` on submit; `GET/PATCH/DELETE /api/mistakes`; `/notebook` page with To revise / Revised tabs, subject chips, mark-as-revised toggle, remove. Result page banner + dashboard count.
+- Share Score Card: canvas-drawn 1080x1080 PNG on Result page (download, WhatsApp wa.me link, copy text, native share).
+- Tested: iteration_2 — all backend + frontend scenarios pass.
+
+## Production setup notes
+- In Razorpay dashboard → Webhooks: URL `https://<domain>/api/payments/razorpay/webhook`, events `payment.captured`, set secret and copy into `RAZORPAY_WEBHOOK_SECRET` (currently a dev placeholder).
+
 ## Backlog
-- P1: Razorpay webhook (auto-activate on payment)
 - P1: Emergent Google Auth option
-- P2: Streak tracking + daily reminder email
+- P2: Daily streak reminder email/push
 - P2: Full-length NEET/JEE Main 180-Q timed papers template
-- P2: Question bookmarks and mistake notebook
+- P2: Question bookmarks (save correct-but-tricky Qs)
+- P2: Referral tracking (attribute signups from shared score cards)
