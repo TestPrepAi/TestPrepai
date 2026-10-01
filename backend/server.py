@@ -110,6 +110,19 @@ class ActivateSubInput(BaseModel):
     payment_reference: str = Field(min_length=3)
 
 
+class OnboardingInput(BaseModel):
+    coaching_enrolled: bool
+    coaching_name: Optional[str] = None
+    target_exam: Literal["jee_main", "jee_advanced", "neet"]
+    target_exam_date: str  # ISO date YYYY-MM-DD
+
+
+class DailyTaskInput(BaseModel):
+    topic: str = Field(min_length=2, max_length=200)
+    subject: Literal["physics", "chemistry", "mathematics", "biology"]
+    num_questions: int = Field(ge=3, le=10, default=5)
+
+
 # ============ Helpers ============
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -171,6 +184,11 @@ def user_public(user: dict) -> dict:
         "questions_used": user.get("questions_used", 0),
         "subscription_expires_at": user.get("subscription_expires_at"),
         "is_subscribed": user_is_subscribed(user),
+        "onboarded": user.get("onboarded", False),
+        "coaching_enrolled": user.get("coaching_enrolled"),
+        "coaching_name": user.get("coaching_name"),
+        "target_exam": user.get("target_exam"),
+        "target_exam_date": user.get("target_exam_date"),
     }
 
 
@@ -541,6 +559,112 @@ async def analytics(user=Depends(get_current_user)):
         "exam_breakdown": exam_break,
         "trend": trend,
     }
+
+
+@api_router.post("/user/onboarding")
+async def onboarding(inp: OnboardingInput, user=Depends(get_current_user)):
+    update = {
+        "onboarded": True,
+        "coaching_enrolled": inp.coaching_enrolled,
+        "coaching_name": (inp.coaching_name or "").strip() or None,
+        "target_exam": inp.target_exam,
+        "target_exam_date": inp.target_exam_date,
+    }
+    await db.users.update_one({"id": user["id"]}, {"$set": update})
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0})
+    return {"user": user_public(fresh)}
+
+
+@api_router.get("/daily/today")
+async def daily_today(user=Depends(get_current_user)):
+    today = now_utc().date().isoformat()
+    doc = await db.daily_tasks.find_one(
+        {"user_id": user["id"], "date": today}, {"_id": 0}
+    )
+    return {"task": doc}
+
+
+@api_router.post("/daily/generate", response_model=TestOut)
+async def daily_generate(inp: DailyTaskInput, user=Depends(get_current_user)):
+    # Validate subject vs user's target exam
+    target = user.get("target_exam") or "jee_main"
+    allowed = {
+        "jee_main": {"physics", "chemistry", "mathematics"},
+        "jee_advanced": {"physics", "chemistry", "mathematics"},
+        "neet": {"physics", "chemistry", "biology"},
+    }[target]
+    if inp.subject not in allowed:
+        raise HTTPException(400, f"Subject '{inp.subject}' not valid for {target}")
+
+    # Reuse generation logic
+    is_sub = user_is_subscribed(user)
+    used = user.get("questions_used", 0)
+    num = inp.num_questions
+    if not is_sub:
+        remaining = FREE_QUESTION_LIMIT - used
+        if remaining <= 0:
+            raise HTTPException(402, "Free question limit reached. Please subscribe.")
+        if num > remaining:
+            num = remaining
+
+    gen_input = GenerateTestInput(
+        exam=target,  # type: ignore
+        subjects=[inp.subject],
+        difficulty="mixed",
+        num_questions=num,
+        topics=inp.topic,
+    )
+    questions = await generate_questions_with_llm(gen_input)
+    duration = len(questions) * 90
+
+    test_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "exam": target,
+        "subjects": [inp.subject],
+        "difficulty": "mixed",
+        "duration_seconds": duration,
+        "questions": questions,
+        "created_at": iso(now_utc()),
+        "source": "daily",
+        "topic": inp.topic,
+    }
+    await db.tests.insert_one(test_doc)
+
+    today = now_utc().date().isoformat()
+    await db.daily_tasks.update_one(
+        {"user_id": user["id"], "date": today},
+        {"$set": {
+            "user_id": user["id"],
+            "date": today,
+            "topic": inp.topic,
+            "subject": inp.subject,
+            "test_id": test_doc["id"],
+            "created_at": iso(now_utc()),
+        }},
+        upsert=True,
+    )
+
+    if not is_sub:
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$inc": {"questions_used": len(questions)}},
+        )
+
+    client_qs = [
+        {"id": q["id"], "subject": q["subject"], "text": q["text"],
+         "options": q["options"], "difficulty": q["difficulty"]}
+        for q in questions
+    ]
+    return TestOut(
+        id=test_doc["id"],
+        exam=target,
+        subjects=[inp.subject],
+        difficulty="mixed",
+        duration_seconds=duration,
+        questions=client_qs,
+        created_at=test_doc["created_at"],
+    )
 
 
 app.include_router(api_router)

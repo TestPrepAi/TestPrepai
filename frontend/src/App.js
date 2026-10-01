@@ -2,12 +2,12 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "sonner";
-import Navbar from "@/components/Navbar";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
+import DailyTask from "@/pages/DailyTask";
 import CreateTest from "@/pages/CreateTest";
 import TakeTest from "@/pages/TakeTest";
 import Result from "@/pages/Result";
@@ -20,14 +20,14 @@ function App() {
     <div className="App">
       <AuthProvider>
         <BrowserRouter>
-          <Navbar />
-          <Toaster position="top-right" theme="dark" richColors />
+          <Toaster position="top-right" richColors />
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/daily-task" element={<ProtectedRoute><DailyTask /></ProtectedRoute>} />
             <Route path="/create-test" element={<ProtectedRoute><CreateTest /></ProtectedRoute>} />
             <Route path="/test/:id" element={<ProtectedRoute><TakeTest /></ProtectedRoute>} />
             <Route path="/result/:id" element={<ProtectedRoute><Result /></ProtectedRoute>} />

@@ -2,12 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
+import AppShell from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Sparkles, Loader2 } from "lucide-react";
 
@@ -16,13 +15,12 @@ const EXAM_OPTIONS = [
   { value: "jee_advanced", label: "JEE Advanced", subjects: ["physics", "chemistry", "mathematics"] },
   { value: "neet", label: "NEET", subjects: ["physics", "chemistry", "biology"] },
 ];
-
 const DIFF = ["easy", "medium", "hard", "mixed"];
 
 export default function CreateTest() {
   const { user, refresh } = useAuth();
   const nav = useNavigate();
-  const [exam, setExam] = useState("jee_main");
+  const [exam, setExam] = useState(user?.target_exam || "jee_main");
   const [subjects, setSubjects] = useState(["physics"]);
   const [difficulty, setDifficulty] = useState("mixed");
   const [num, setNum] = useState(5);
@@ -69,42 +67,36 @@ export default function CreateTest() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] pt-24 pb-16 px-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <div className="text-xs uppercase tracking-widest text-slate-500">Create test</div>
-          <h1 className="font-display text-3xl sm:text-4xl font-bold mt-1">Design your mock test</h1>
-          <p className="text-slate-400 text-sm mt-1">AI will generate fresh, syllabus-accurate MCQs.</p>
+    <AppShell title="Custom Test">
+      <div className="max-w-3xl">
+        <div className="mb-6">
+          <h1 className="font-display text-2xl md:text-3xl font-extrabold text-slate-900">Design your mock test</h1>
+          <p className="text-sm text-slate-500 mt-1">AI will generate fresh, syllabus-accurate MCQs.</p>
         </div>
 
-        <Card className="p-6 md:p-8 bg-slate-900/60 border-slate-800 space-y-8">
+        <Card className="p-6 md:p-8 soft-card space-y-6">
           <div>
-            <Label className="text-slate-300 mb-3 block">Exam</Label>
-            <RadioGroup
-              value={exam}
-              onValueChange={(v) => { setExam(v); const cfg = EXAM_OPTIONS.find(e => e.value === v); setSubjects([cfg.subjects[0]]); }}
-              className="grid grid-cols-1 md:grid-cols-3 gap-3"
-            >
+            <Label className="text-slate-900 font-semibold mb-3 block">Exam</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {EXAM_OPTIONS.map((e) => (
-                <label
+                <button
                   key={e.value}
+                  type="button"
                   data-testid={`create-exam-${e.value}`}
-                  className={`cursor-pointer rounded-xl p-4 border transition-smooth ${
-                    exam === e.value ? "border-indigo-500 bg-indigo-500/10" : "border-slate-800 hover:border-slate-700 bg-slate-900/50"
+                  onClick={() => { setExam(e.value); setSubjects([e.subjects[0]]); }}
+                  className={`rounded-xl p-4 border-2 text-left transition-smooth ${
+                    exam === e.value ? "border-violet-600 bg-violet-50" : "border-slate-200 hover:border-slate-300"
                   }`}
                 >
-                  <RadioGroupItem value={e.value} className="sr-only" />
-                  <div className="font-semibold">{e.label}</div>
-                  <div className="text-xs text-slate-500 mt-1 font-mono">
-                    {e.subjects.join(" · ")}
-                  </div>
-                </label>
+                  <div className="font-semibold text-slate-900">{e.label}</div>
+                  <div className="text-xs text-slate-500 mt-1 font-mono">{e.subjects.join(" · ")}</div>
+                </button>
               ))}
-            </RadioGroup>
+            </div>
           </div>
 
           <div>
-            <Label className="text-slate-300 mb-3 block">Subjects</Label>
+            <Label className="text-slate-900 font-semibold mb-3 block">Subjects</Label>
             <div className="flex flex-wrap gap-2">
               {examCfg.subjects.map((s) => (
                 <button
@@ -112,20 +104,18 @@ export default function CreateTest() {
                   type="button"
                   data-testid={`create-subject-${s}`}
                   onClick={() => toggleSubject(s)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-smooth ${
-                    subjects.includes(s)
-                      ? "bg-indigo-500 border-indigo-500 text-white"
-                      : "bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700"
+                  className={`px-4 py-2 rounded-full text-sm font-semibold border-2 transition-smooth capitalize ${
+                    subjects.includes(s) ? "bg-violet-600 border-violet-600 text-white" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                   }`}
                 >
-                  {s[0].toUpperCase() + s.slice(1)}
+                  {s}
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <Label className="text-slate-300 mb-3 block">Difficulty</Label>
+            <Label className="text-slate-900 font-semibold mb-3 block">Difficulty</Label>
             <div className="flex flex-wrap gap-2">
               {DIFF.map((d) => (
                 <button
@@ -133,10 +123,8 @@ export default function CreateTest() {
                   type="button"
                   data-testid={`create-difficulty-${d}`}
                   onClick={() => setDifficulty(d)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-smooth capitalize ${
-                    difficulty === d
-                      ? "bg-amber-500 border-amber-500 text-slate-900"
-                      : "bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700"
+                  className={`px-4 py-2 rounded-full text-sm font-semibold border-2 transition-smooth capitalize ${
+                    difficulty === d ? "bg-amber-400 border-amber-400 text-slate-900" : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                   }`}
                 >
                   {d}
@@ -147,7 +135,9 @@ export default function CreateTest() {
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="num" className="text-slate-300">Number of questions {!isSub && `(free left: ${remaining})`}</Label>
+              <Label htmlFor="num" className="text-slate-900 font-semibold">
+                Number of questions {!isSub && <span className="text-slate-500 font-normal">(free left: {remaining})</span>}
+              </Label>
               <Input
                 id="num"
                 data-testid="create-num-input"
@@ -156,36 +146,35 @@ export default function CreateTest() {
                 max={isSub ? 30 : Math.max(1, remaining)}
                 value={num}
                 onChange={(e) => setNum(Math.max(1, parseInt(e.target.value || "1", 10)))}
-                className="mt-1.5 bg-slate-800 border-slate-700"
+                className="mt-1.5 h-11"
               />
               {!isSub && num > remaining && (
-                <p className="text-xs text-amber-400 mt-1.5">Will be capped to {remaining} free question(s).</p>
+                <p className="text-xs text-amber-600 mt-1.5">Will be capped to {remaining} free question(s).</p>
               )}
             </div>
             <div>
-              <Label htmlFor="topics" className="text-slate-300">Focus topics (optional)</Label>
+              <Label htmlFor="topics" className="text-slate-900 font-semibold">Focus topics (optional)</Label>
               <Input
                 id="topics"
                 data-testid="create-topics-input"
                 value={topics}
                 onChange={(e) => setTopics(e.target.value)}
                 placeholder="e.g. Kinematics, Thermodynamics"
-                className="mt-1.5 bg-slate-800 border-slate-700"
+                className="mt-1.5 h-11"
               />
             </div>
           </div>
 
           <Button
             data-testid="create-generate-btn"
-            size="lg"
             disabled={loading}
             onClick={submit}
-            className="w-full bg-indigo-500 hover:bg-indigo-600 h-12"
+            className="w-full h-12 bg-violet-600 hover:bg-violet-700 text-white"
           >
             {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating with GPT-5.6…</> : <><Sparkles className="w-4 h-4 mr-2" /> Generate mock test</>}
           </Button>
         </Card>
       </div>
-    </div>
+    </AppShell>
   );
 }

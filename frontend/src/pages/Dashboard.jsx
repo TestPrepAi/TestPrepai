@@ -1,171 +1,303 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
+import AppShell from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { PlusCircle, Flame, Target, BarChart3, Sparkles, TrendingUp } from "lucide-react";
+import {
+  SlidersHorizontal, Clock3, BookMarked, Calendar, LineChart, Flame, Sparkles, ArrowRight
+} from "lucide-react";
+
+const TOOLS = [
+  { to: "/create-test", title: "Custom Test", sub: "Build your own", color: "bg-violet-100 text-violet-700", icon: SlidersHorizontal, testid: "tool-custom-test" },
+  { to: "/daily-task", title: "Daily Task", sub: "Topic → quiz", color: "bg-amber-100 text-amber-700", icon: Calendar, testid: "tool-daily-task" },
+  { to: "/analytics", title: "Analytics", sub: "Track growth", color: "bg-rose-100 text-rose-700", icon: LineChart, testid: "tool-analytics" },
+  { to: "/history", title: "Past Attempts", sub: "Review mistakes", color: "bg-emerald-100 text-emerald-700", icon: BookMarked, testid: "tool-history" },
+  { to: "/create-test", title: "Timed Mock", sub: "NTA simulator", color: "bg-sky-100 text-sky-700", icon: Clock3, testid: "tool-timed-mock" },
+  { to: "/pricing", title: "Go PRO", sub: "₹49 / 28 days", color: "bg-slate-900 text-amber-300", icon: Sparkles, testid: "tool-upgrade" },
+];
+
+function daysUntil(iso) {
+  if (!iso) return null;
+  const t = new Date(iso + "T00:00:00").getTime();
+  return Math.max(0, Math.ceil((t - Date.now()) / 86400000));
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
   const nav = useNavigate();
   const [attempts, setAttempts] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [daily, setDaily] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [a, s] = await Promise.all([
+        const [a, s, d] = await Promise.all([
           api.get("/attempts"),
           api.get("/analytics/summary"),
+          api.get("/daily/today"),
         ]);
         setAttempts(a.data.attempts || []);
         setAnalytics(s.data);
+        setDaily(d.data.task);
       } catch { /* ignore */ }
     })();
   }, []);
 
   const used = user?.questions_used || 0;
   const remaining = Math.max(0, 5 - used);
-  const isSub = user?.is_subscribed;
+  const dLeft = daysUntil(user?.target_exam_date);
+
+  const subjectDonut = useMemo(() => {
+    if (!analytics?.subject_breakdown?.length) return [];
+    return analytics.subject_breakdown;
+  }, [analytics]);
+
+  const totalAcc = analytics?.avg_score ?? 0;
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] pt-24 pb-16 px-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
-          <div>
-            <div className="text-xs uppercase tracking-widest text-slate-500">Dashboard</div>
-            <h1 data-testid="dashboard-heading" className="font-display text-3xl sm:text-4xl font-bold mt-1">
-              Namaste, {user?.name?.split(" ")[0] || "aspirant"} 👋
-            </h1>
-            <p className="text-slate-400 mt-1 text-sm">Ready to conquer today's mock test?</p>
-          </div>
-          <Button
-            data-testid="dashboard-new-test-btn"
-            size="lg"
-            className="bg-indigo-500 hover:bg-indigo-600"
-            onClick={() => nav("/create-test")}
-          >
-            <PlusCircle className="w-4 h-4 mr-2" /> New Mock Test
-          </Button>
-        </div>
+    <AppShell title="Home">
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Study Tools */}
+          <section className="soft-card rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-lg font-bold">Study Tools</h2>
+              <span className="text-xs text-slate-500">Pick an action</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {TOOLS.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <Link
+                    key={t.title}
+                    to={t.to}
+                    data-testid={t.testid}
+                    className="group p-4 rounded-xl border border-slate-200 hover:border-slate-300 hover:-translate-y-0.5 bg-white transition-smooth"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-11 h-11 rounded-full flex items-center justify-center ${t.color}`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-slate-900 truncate">{t.title}</div>
+                        <div className="text-xs text-slate-500">{t.sub}</div>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
 
-        {/* Quota / Sub card */}
-        {!isSub ? (
-          <Card className="p-6 mb-8 bg-gradient-to-br from-indigo-950/40 to-amber-950/20 border-amber-500/30">
+          {/* Daily Task banner */}
+          <section
+            className="rounded-2xl p-6 border border-violet-200 bg-gradient-to-r from-violet-50 to-amber-50"
+            data-testid="dashboard-daily-banner"
+          >
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex-1 min-w-[240px]">
-                <div className="text-xs uppercase tracking-widest text-amber-400 mb-2">Free Trial</div>
-                <div className="font-display text-2xl font-bold">
-                  {remaining > 0 ? `${remaining} of 5 free questions left` : "You have used all 5 free questions"}
+              <div>
+                <div className="text-xs uppercase tracking-widest text-violet-600 font-semibold mb-1">
+                  Today's task
                 </div>
-                <Progress value={(used / 5) * 100} className="mt-3 h-2 bg-slate-800" />
-                <p className="text-sm text-slate-400 mt-3">
-                  Unlock unlimited JEE Main, JEE Advanced & NEET mock tests for just ₹49 / 28 days.
+                <h3 className="font-display text-2xl font-bold text-slate-900">
+                  {daily
+                    ? `Topic: ${daily.topic}`
+                    : "What did you learn today?"}
+                </h3>
+                <p className="text-sm text-slate-600 mt-1 max-w-lg">
+                  {daily
+                    ? `Review your ${daily.subject} questions and lock in today's class.`
+                    : "Tell us the topic from today's class and we'll generate a quick quiz on it."}
                 </p>
               </div>
               <Button
-                data-testid="dashboard-upgrade-btn"
+                data-testid="dashboard-daily-cta"
                 size="lg"
-                className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold"
-                onClick={() => nav("/pricing")}
+                onClick={() => nav("/daily-task")}
+                className="bg-violet-600 hover:bg-violet-700 text-white rounded-full px-6"
               >
-                Upgrade to PRO — ₹49
+                {daily ? "Review today's quiz" : "Start today's quiz"} <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
-          </Card>
-        ) : (
-          <Card className="p-6 mb-8 bg-gradient-to-br from-emerald-950/40 to-indigo-950/20 border-emerald-500/30">
-            <div className="flex items-center gap-4">
-              <Sparkles className="w-8 h-8 text-emerald-400" />
-              <div>
-                <div className="text-xs uppercase tracking-widest text-emerald-400 mb-1">PRO Active</div>
-                <div className="font-display text-xl font-bold">Unlimited mock tests unlocked</div>
-                <div className="text-sm text-slate-400 mt-1 font-mono">
-                  Expires {user.subscription_expires_at ? new Date(user.subscription_expires_at).toLocaleDateString() : "-"}
+          </section>
+
+          {/* Recent attempts */}
+          <section className="soft-card rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-lg font-bold">Recent attempts</h2>
+              <Link to="/history" className="text-xs text-violet-600 font-semibold hover:text-violet-700">View all</Link>
+            </div>
+            {attempts.length === 0 ? (
+              <div className="py-10 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                  <LineChart className="w-6 h-6 text-slate-400" />
                 </div>
+                <p className="text-sm text-slate-500 mb-4">No attempts yet. Generate your first AI mock test →</p>
+                <Button
+                  data-testid="dashboard-empty-cta"
+                  onClick={() => nav("/create-test")}
+                  className="bg-violet-600 hover:bg-violet-700 text-white"
+                >
+                  Create test
+                </Button>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {attempts.slice(0, 5).map((a) => (
+                  <Link
+                    key={a.id}
+                    to={`/result/${a.id}`}
+                    data-testid={`recent-attempt-${a.id}`}
+                    className="flex items-center justify-between py-3 hover:bg-slate-50 -mx-2 px-2 rounded-lg transition-smooth"
+                  >
+                    <div>
+                      <div className="font-semibold text-slate-900 capitalize text-sm">
+                        {a.exam.replace("_", " ")} · {a.subjects.join(", ")}
+                      </div>
+                      <div className="text-xs text-slate-500 font-mono">
+                        {new Date(a.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono text-lg font-bold text-slate-900">{a.score_pct}%</div>
+                      <div className="text-xs text-slate-500">{a.correct}/{a.total}</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* Right rail */}
+        <aside className="space-y-6">
+          <div className="soft-card rounded-2xl p-6">
+            <div className="flex items-baseline gap-2">
+              <span className="font-display text-5xl font-extrabold text-violet-600 font-mono" data-testid="rail-days-left">
+                {dLeft ?? "—"}
+              </span>
+              <span className="text-slate-500 text-sm">Days</span>
+            </div>
+            <div className="text-sm text-slate-500">
+              left for {user?.target_exam ? user.target_exam.replace("_", " ").toUpperCase() : "your exam"}
+            </div>
+
+            <div className="mt-5 flex items-center gap-5">
+              <Donut percentage={totalAcc} />
+              <div className="space-y-2">
+                {subjectDonut.length === 0 ? (
+                  <>
+                    <Dot color="bg-violet-400" label="Physics" />
+                    <Dot color="bg-amber-400" label="Chemistry" />
+                    <Dot color="bg-emerald-400" label="Math/Bio" />
+                  </>
+                ) : (
+                  subjectDonut.slice(0, 4).map((s, i) => (
+                    <Dot
+                      key={s.subject}
+                      color={["bg-violet-400", "bg-amber-400", "bg-emerald-400", "bg-sky-400"][i % 4]}
+                      label={`${s.subject[0].toUpperCase()}${s.subject.slice(1)} · ${s.accuracy}%`}
+                    />
+                  ))
+                )}
               </div>
             </div>
-          </Card>
-        )}
 
-        {/* Bento stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="p-6 bg-slate-900/70 border-slate-800">
-            <div className="flex items-center justify-between">
-              <div className="text-xs uppercase tracking-widest text-slate-500">Tests taken</div>
-              <Target className="w-4 h-4 text-indigo-400" />
-            </div>
-            <div className="mt-3 font-mono text-4xl font-bold" data-testid="stat-total-tests">
-              {analytics?.total_attempts ?? 0}
-            </div>
-          </Card>
-          <Card className="p-6 bg-slate-900/70 border-slate-800">
-            <div className="flex items-center justify-between">
-              <div className="text-xs uppercase tracking-widest text-slate-500">Avg. score</div>
-              <TrendingUp className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="mt-3 font-mono text-4xl font-bold" data-testid="stat-avg-score">
-              {analytics?.avg_score ?? 0}%
-            </div>
-          </Card>
-          <Card className="p-6 bg-slate-900/70 border-slate-800">
-            <div className="flex items-center justify-between">
-              <div className="text-xs uppercase tracking-widest text-slate-500">Questions attempted</div>
-              <Flame className="w-4 h-4 text-rose-400" />
-            </div>
-            <div className="mt-3 font-mono text-4xl font-bold" data-testid="stat-total-questions">
-              {analytics?.total_questions ?? 0}
-            </div>
-          </Card>
-        </div>
+            <p className="mt-5 text-sm italic text-amber-600 font-medium">
+              Practice more. Track more. Improve more.
+            </p>
 
-        {/* Recent attempts */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-xl font-semibold">Recent attempts</h2>
-          <Link to="/history" className="text-sm text-indigo-400 hover:text-indigo-300">View all</Link>
-        </div>
-        {attempts.length === 0 ? (
-          <Card className="p-10 text-center bg-slate-900/50 border-dashed border-slate-800">
-            <BarChart3 className="w-8 h-8 mx-auto text-slate-500 mb-3" />
-            <p className="text-slate-400">No attempts yet. Generate your first AI mock test →</p>
             <Button
-              data-testid="dashboard-empty-cta"
-              className="mt-4 bg-indigo-500 hover:bg-indigo-600"
+              data-testid="rail-start-test-btn"
               onClick={() => nav("/create-test")}
+              className="w-full mt-4 bg-violet-100 hover:bg-violet-200 text-violet-700 font-semibold border border-violet-200 rounded-xl"
             >
-              Create test
+              Start your first test
             </Button>
-          </Card>
-        ) : (
-          <div className="grid gap-3">
-            {attempts.slice(0, 5).map((a) => (
-              <Link
-                key={a.id}
-                to={`/result/${a.id}`}
-                data-testid={`recent-attempt-${a.id}`}
-                className="flex items-center justify-between p-4 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition-smooth"
-              >
-                <div className="flex items-center gap-4">
-                  <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/40 uppercase">
-                    {a.exam.replace("_", " ")}
-                  </Badge>
-                  <div>
-                    <div className="font-medium">{a.subjects.map((s) => s[0].toUpperCase() + s.slice(1)).join(" · ")}</div>
-                    <div className="text-xs text-slate-500 font-mono">{new Date(a.created_at).toLocaleString()}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-xl font-bold">{a.score_pct}%</div>
-                  <div className="text-xs text-slate-500">{a.correct}/{a.total} correct</div>
-                </div>
-              </Link>
-            ))}
           </div>
-        )}
+
+          <div className="soft-card rounded-2xl p-6 space-y-3">
+            <KV k="Questions Done" v={analytics?.total_questions ?? 0} testid="rail-questions-done" />
+            <KV k="Tests Taken" v={analytics?.total_attempts ?? 0} testid="rail-tests-taken" />
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
+              <div>
+                <div className="text-xs text-slate-500">Avg. Score</div>
+                <div className="font-mono text-lg font-bold text-slate-900">{totalAcc}%</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-500">Correct</div>
+                <div className="font-mono text-lg font-bold text-emerald-600">{analytics?.total_correct ?? 0}</div>
+              </div>
+            </div>
+          </div>
+
+          {!user?.is_subscribed && (
+            <div className="rounded-2xl p-6 bg-slate-900 text-white relative overflow-hidden">
+              <div className="absolute -right-10 -top-10 w-40 h-40 bg-amber-400/20 rounded-full blur-3xl" />
+              <Flame className="w-6 h-6 text-amber-400" />
+              <div className="font-display text-xl font-bold mt-3">
+                {remaining > 0 ? `${remaining}/5 free Qs left` : "Free limit reached"}
+              </div>
+              <p className="text-sm text-slate-300 mt-1">Unlock unlimited tests for ₹49 / 28 days.</p>
+              <Progress value={(used / 5) * 100} className="mt-3 h-1.5 bg-slate-700" />
+              <Button
+                data-testid="rail-upgrade-btn"
+                size="sm"
+                onClick={() => nav("/pricing")}
+                className="w-full mt-4 bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold"
+              >
+                Upgrade — ₹49
+              </Button>
+            </div>
+          )}
+        </aside>
       </div>
+    </AppShell>
+  );
+}
+
+function Dot({ color, label }) {
+  return (
+    <div className="flex items-center gap-2 text-sm text-slate-600">
+      <span className={`w-2.5 h-2.5 rounded-full ${color}`} />
+      <span>{label}</span>
     </div>
+  );
+}
+
+function KV({ k, v, testid }) {
+  return (
+    <div className="flex items-center justify-between py-1" data-testid={testid}>
+      <span className="text-sm text-slate-500">{k}</span>
+      <span className="font-mono font-bold text-slate-900">{v}</span>
+    </div>
+  );
+}
+
+function Donut({ percentage }) {
+  const pct = Math.max(0, Math.min(100, percentage));
+  const stroke = 12;
+  const size = 100;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const off = c - (pct / 100) * c;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#F1F5F9" strokeWidth={stroke} />
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none"
+        stroke="#6D5EFC" strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={c} strokeDashoffset={off}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+      <text x="50%" y="46%" textAnchor="middle" className="fill-slate-900 font-mono font-bold" fontSize="18">
+        {pct}%
+      </text>
+      <text x="50%" y="62%" textAnchor="middle" className="fill-slate-500" fontSize="10">Avg</text>
+    </svg>
   );
 }

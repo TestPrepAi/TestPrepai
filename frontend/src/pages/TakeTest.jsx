@@ -7,9 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Loader2, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 
-// status: 0=notVisited, 1=notAnswered, 2=answered, 3=marked, 4=answeredMarked
 const STATUS_STYLE = {
-  0: "bg-slate-700 text-slate-300",
+  0: "bg-slate-200 text-slate-600",
   1: "bg-rose-500 text-white",
   2: "bg-emerald-500 text-white",
   3: "bg-violet-500 text-white",
@@ -22,7 +21,7 @@ export default function TakeTest() {
   const [test, setTest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState({}); // qid -> {selected, marked, time}
+  const [answers, setAnswers] = useState({});
   const [remaining, setRemaining] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const startAtRef = useRef(Date.now());
@@ -36,7 +35,6 @@ export default function TakeTest() {
         setRemaining(data.duration_seconds);
         const init = {};
         data.questions.forEach((q) => { init[q.id] = { selected: null, marked: false, time: 0, status: 0 }; });
-        // mark first as visited
         if (data.questions[0]) init[data.questions[0].id].status = 1;
         setAnswers(init);
       } catch {
@@ -44,10 +42,8 @@ export default function TakeTest() {
         nav("/dashboard");
       } finally { setLoading(false); }
     })();
-    // eslint-disable-next-line
-  }, [id]);
+  }, [id, nav]);
 
-  // Timer
   useEffect(() => {
     if (!test) return;
     const t = setInterval(() => {
@@ -73,7 +69,7 @@ export default function TakeTest() {
   };
 
   const goTo = (idx) => {
-    if (idx < 0 || idx >= test.questions.length) return;
+    if (!test || idx < 0 || idx >= test.questions.length) return;
     commitTime();
     setCurrent(idx);
     const nid = test.questions[idx].id;
@@ -88,10 +84,7 @@ export default function TakeTest() {
     setAnswers((prev) => {
       const cur = prev[q.id];
       const marked = cur.marked;
-      return {
-        ...prev,
-        [q.id]: { ...cur, selected: idx, status: marked ? 4 : 2 },
-      };
+      return { ...prev, [q.id]: { ...cur, selected: idx, status: marked ? 4 : 2 } };
     });
   };
 
@@ -105,9 +98,8 @@ export default function TakeTest() {
   const markForReviewNext = () => {
     setAnswers((prev) => {
       const cur = prev[q.id];
-      const marked = true;
       const status = cur.selected != null ? 4 : 3;
-      return { ...prev, [q.id]: { ...cur, marked, status } };
+      return { ...prev, [q.id]: { ...cur, marked: true, status } };
     });
     goTo(current + 1);
   };
@@ -131,7 +123,7 @@ export default function TakeTest() {
       const { data } = await api.post("/tests/submit", payload);
       toast.success(`Submitted! Score: ${data.score_pct}%`);
       nav(`/result/${data.id}`);
-    } catch (err) {
+    } catch {
       toast.error("Submission failed");
     } finally { setSubmitting(false); }
   };
@@ -144,14 +136,13 @@ export default function TakeTest() {
       if (s === 0) c.notVisited++;
       else if (s === 1) c.notAnswered++;
       else if (s === 2) c.answered++;
-      else if (s === 3) c.marked++;
-      else if (s === 4) c.marked++;
+      else if (s === 3 || s === 4) c.marked++;
     });
     return c;
   }, [answers, test]);
 
-  const timeColor = remaining > (test?.duration_seconds || 1) * 0.5 ? "text-emerald-400"
-    : remaining > (test?.duration_seconds || 1) * 0.2 ? "text-amber-400" : "text-rose-400";
+  const timeColor = remaining > (test?.duration_seconds || 1) * 0.5 ? "text-emerald-600"
+    : remaining > (test?.duration_seconds || 1) * 0.2 ? "text-amber-600" : "text-rose-600";
 
   const fmt = (s) => {
     const m = Math.floor(s / 60).toString().padStart(2, "0");
@@ -160,39 +151,34 @@ export default function TakeTest() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0B0F19]">
-        <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center bg-[#F7F7FB]"><Loader2 className="w-6 h-6 animate-spin text-violet-600" /></div>;
   }
   if (!test) return null;
 
   const sel = answers[q.id]?.selected;
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] pt-20 pb-8 px-4">
+    <div className="min-h-screen bg-[#F7F7FB] py-6 px-4">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 soft-card rounded-2xl px-5 py-3">
           <div className="flex items-center gap-3">
-            <Badge className="uppercase bg-indigo-500/20 border-indigo-500/40 text-indigo-300">
+            <Badge className="uppercase bg-violet-100 text-violet-700 border-violet-200">
               {test.exam.replace("_", " ")}
             </Badge>
-            <span className="text-xs text-slate-400 font-mono uppercase">{test.subjects.join(" · ")}</span>
+            <span className="text-xs text-slate-500 font-mono uppercase">{test.subjects.join(" · ")}</span>
           </div>
-          <div className={`flex items-center gap-2 font-mono text-2xl font-bold ${timeColor}`} data-testid="test-timer">
+          <div className={`flex items-center gap-2 font-mono text-xl font-bold ${timeColor}`} data-testid="test-timer">
             <Clock className="w-5 h-5" /> {fmt(remaining)}
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-12 gap-6">
-          {/* Question panel */}
-          <Card className="lg:col-span-8 p-6 md:p-8 bg-slate-900/70 border-slate-800">
-            <div className="flex items-center justify-between text-xs uppercase tracking-widest text-slate-500">
+        <div className="grid lg:grid-cols-12 gap-5">
+          <Card className="lg:col-span-8 p-6 md:p-8 soft-card">
+            <div className="flex items-center justify-between text-xs uppercase tracking-widest text-slate-500 font-semibold">
               <span>Question {current + 1} of {test.questions.length}</span>
               <span className="font-mono capitalize">{q.subject} · {q.difficulty}</span>
             </div>
-            <div className="mt-4 font-display text-lg md:text-xl leading-relaxed whitespace-pre-wrap" data-testid="question-text">
+            <div className="mt-4 font-display text-lg md:text-xl leading-relaxed whitespace-pre-wrap text-slate-900" data-testid="question-text">
               {q.text}
             </div>
             <div className="mt-6 space-y-3">
@@ -201,59 +187,35 @@ export default function TakeTest() {
                   key={idx}
                   data-testid={`option-${idx}`}
                   onClick={() => selectOption(idx)}
-                  className={`w-full text-left p-4 rounded-xl border transition-smooth ${
+                  className={`w-full text-left p-4 rounded-xl border-2 transition-smooth ${
                     sel === idx
-                      ? "border-indigo-500 bg-indigo-500/15 text-white"
-                      : "border-slate-800 bg-slate-900/50 hover:border-slate-700 text-slate-200"
+                      ? "border-violet-600 bg-violet-50 text-slate-900"
+                      : "border-slate-200 hover:border-slate-300 bg-white text-slate-800"
                   }`}
                 >
-                  <span className="font-mono text-xs text-slate-500 mr-3">{String.fromCharCode(65 + idx)}.</span>
+                  <span className="font-mono text-xs text-slate-400 mr-3">{String.fromCharCode(65 + idx)}.</span>
                   {opt}
                 </button>
               ))}
             </div>
 
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button
-                data-testid="test-prev-btn"
-                variant="outline"
-                className="border-slate-700"
-                onClick={() => goTo(current - 1)}
-                disabled={current === 0}
-              >
+            <div className="mt-8 flex flex-wrap gap-2">
+              <Button data-testid="test-prev-btn" variant="outline" className="border-slate-300" onClick={() => goTo(current - 1)} disabled={current === 0}>
                 <ChevronLeft className="w-4 h-4 mr-1" /> Prev
               </Button>
-              <Button
-                data-testid="test-clear-btn"
-                variant="outline"
-                className="border-slate-700"
-                onClick={clearResponse}
-              >
-                Clear
+              <Button data-testid="test-clear-btn" variant="outline" className="border-slate-300" onClick={clearResponse}>Clear</Button>
+              <Button data-testid="test-mark-review-btn" variant="outline" className="border-violet-300 text-violet-700" onClick={markForReviewNext}>
+                Mark for review &amp; next
               </Button>
-              <Button
-                data-testid="test-mark-review-btn"
-                variant="outline"
-                className="border-violet-500/50 text-violet-300"
-                onClick={markForReviewNext}
-              >
-                Mark for review & next
-              </Button>
-              <Button
-                data-testid="test-save-next-btn"
-                className="bg-indigo-500 hover:bg-indigo-600 ml-auto"
-                onClick={saveNext}
-                disabled={current === test.questions.length - 1}
-              >
-                Save & Next <ChevronRight className="w-4 h-4 ml-1" />
+              <Button data-testid="test-save-next-btn" className="bg-violet-600 hover:bg-violet-700 text-white ml-auto" onClick={saveNext} disabled={current === test.questions.length - 1}>
+                Save &amp; Next <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             </div>
           </Card>
 
-          {/* Palette */}
           <div className="lg:col-span-4 space-y-4">
-            <Card className="p-4 bg-slate-900/70 border-slate-800">
-              <div className="text-xs uppercase tracking-widest text-slate-500 mb-3">Question palette</div>
+            <Card className="p-4 soft-card">
+              <div className="text-xs uppercase tracking-widest text-slate-500 mb-3 font-semibold">Question palette</div>
               <div className="grid grid-cols-6 gap-2">
                 {test.questions.map((qq, idx) => {
                   const st = answers[qq.id]?.status ?? 0;
@@ -262,9 +224,7 @@ export default function TakeTest() {
                       key={qq.id}
                       data-testid={`palette-q-${idx + 1}`}
                       onClick={() => goTo(idx)}
-                      className={`h-9 rounded-md font-mono text-xs font-semibold transition-smooth ${STATUS_STYLE[st]} ${
-                        current === idx ? "ring-2 ring-white/70" : ""
-                      }`}
+                      className={`h-9 rounded-md font-mono text-xs font-semibold transition-smooth ${STATUS_STYLE[st]} ${current === idx ? "ring-2 ring-violet-600" : ""}`}
                     >
                       {idx + 1}
                     </button>
@@ -275,16 +235,10 @@ export default function TakeTest() {
                 <Legend color="bg-emerald-500" label={`Answered ${counts.answered}`} />
                 <Legend color="bg-rose-500" label={`Not answered ${counts.notAnswered}`} />
                 <Legend color="bg-violet-500" label={`Marked ${counts.marked}`} />
-                <Legend color="bg-slate-700" label={`Not visited ${counts.notVisited}`} />
+                <Legend color="bg-slate-300" label={`Not visited ${counts.notVisited}`} />
               </div>
             </Card>
-            <Button
-              data-testid="test-submit-btn"
-              size="lg"
-              disabled={submitting}
-              onClick={handleSubmit}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold"
-            >
+            <Button data-testid="test-submit-btn" size="lg" disabled={submitting} onClick={handleSubmit} className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold">
               {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting…</> : "Submit Test"}
             </Button>
           </div>
@@ -296,7 +250,7 @@ export default function TakeTest() {
 
 function Legend({ color, label }) {
   return (
-    <div className="flex items-center gap-2 text-slate-300">
+    <div className="flex items-center gap-2 text-slate-600">
       <span className={`w-3 h-3 rounded ${color}`} />
       <span>{label}</span>
     </div>

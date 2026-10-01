@@ -1,0 +1,31 @@
+{
+  "summary": "Backend smoke test for JEE/NEET Mock Test AI. All 17 requested checks passed on the public API. Fresh user created, full flow exercised: register/login/me, free-limit gating (5 Qs cap + auto-cap on partial + 402 after limit), GPT-5.6-terra question generation (valid 4-option MCQs, client-safe get_test), subscription activation (28 days, no increment post-sub), submit with mixed answers producing score_pct/subject_stats/explanations, attempt list/detail and analytics summary all functional.",
+  "tested_scope": ["backend", "auth", "integration"],
+  "passed": [
+    "GET /api/ returns message + razorpay_link",
+    "POST /api/auth/register creates user (questions_used=0) and returns JWT",
+    "POST /api/auth/register duplicate email -> 400",
+    "POST /api/auth/login valid -> token+user",
+    "POST /api/auth/login wrong password -> 401",
+    "GET /api/auth/me returns user with valid token",
+    "GET /api/subscription/status returns free_limit=5, is_subscribed=false, razorpay_link",
+    "Protected endpoint returns 401 without Authorization header",
+    "POST /api/tests/generate (jee_main + physics, 3 Qs) via gpt-5.6-terra returned 3 valid 4-option MCQs; no correct_index/explanation leaked",
+    "questions_used incremented by 3 after first generation",
+    "GET /api/tests/{id} is client-safe (no correct_index/explanation)",
+    "Second generation capped from 5 to remaining 2; questions_used=5",
+    "Post-limit generation returns 402",
+    "POST /api/subscription/activate sets subscription_expires_at and is_subscribed=true",
+    "Post-subscription generation does NOT increment questions_used (stays at 5)",
+    "POST /api/tests/submit returns score_pct, subject_stats, details w/ explanations",
+    "GET /api/attempts/{id} returns full attempt with details array",
+    "GET /api/attempts returns list without details",
+    "GET /api/analytics/summary returns total_attempts, avg_score, subject_breakdown, exam_breakdown, trend"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "100%", "frontend": "not tested"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "RAZORPAY_PAYMENT_LINK in .env is placeholder 'https://rzp.io/l/your-payment-link' — update before production. LLM generation avg ~10-20s per call, within timeout."
+}
